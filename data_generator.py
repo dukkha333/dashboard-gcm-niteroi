@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def generate_bogcm_mock_data(records=2000, version=2):
+def generate_bogcm_mock_data(records=2000):
     np.random.seed(42)
     start_date = datetime(2026, 1, 1)
     

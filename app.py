@@ -58,11 +58,12 @@ section[data-testid="stSidebar"] {{ background-color: {FUNDO_CARD}; }}
 </style>
 """, unsafe_allow_html=True)
 
+# Mudança de nome da função força renovação limpa do cache do Streamlit
 @st.cache_data
-def load_data():
-    return generate_bogcm_mock_data(records=2000, version=2)
+def load_data_v2():
+    return generate_bogcm_mock_data(records=2000)
 
-df_raw = load_data()
+df_raw = load_data_v2()
 
 # ==============================================================================
 # BARRA LATERAL (FILTROS TEMPORAIS E OPERACIONAIS)
