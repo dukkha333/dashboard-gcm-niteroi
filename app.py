@@ -60,7 +60,7 @@ section[data-testid="stSidebar"] {{ background-color: {FUNDO_CARD}; }}
 
 @st.cache_data
 def load_data():
-    return generate_bogcm_mock_data(2000)
+    return generate_bogcm_mock_data(records=2000, version=2)
 
 df_raw = load_data()
 

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def generate_bogcm_mock_data(records=2000):
+def generate_bogcm_mock_data(records=2000, version=2):
     np.random.seed(42)
     start_date = datetime(2026, 1, 1)
     
@@ -44,15 +44,13 @@ def generate_bogcm_mock_data(records=2000):
         bogcm_id = f"BOGCM-2026-{i+1001:05d}"
         days_offset = np.random.randint(0, 240)
         
-        # Sorteio de hora realista por tipo de serviço
         coord_choice = np.random.choice(
             list(categorias.keys()), 
-            p=[0.25, 0.18, 0.10, 0.17, 0.15, 0.08, 0.07] # 25% para CASS/PSR
+            p=[0.25, 0.18, 0.10, 0.17, 0.15, 0.08, 0.07]
         )
         cat_nome, tipos = categorias[coord_choice]
         tipo = np.random.choice(tipos)
 
-        # Horários táticos probabilísticos
         if tipo == 'Fiscalização de Som Alto / Perturbação':
             hour = np.random.choice([20, 21, 22, 23, 0, 1, 2, 3])
         elif tipo in ['Abordagem e Acolhimento PSR', 'Desmobilização de Acampamento PSR']:
@@ -64,7 +62,6 @@ def generate_bogcm_mock_data(records=2000):
 
         dt = start_date + timedelta(days=int(days_offset), hours=int(hour))
         
-        # Pessoas em situação de rua concentradas no Centro e Icaraí
         if coord_choice == 'CASS':
             insp = np.random.choice(['1ª Inspetoria (Centro)', '2ª Inspetoria (Icaraí)'], p=[0.70, 0.30])
         else:
@@ -81,14 +78,13 @@ def generate_bogcm_mock_data(records=2000):
         veiculos = 1 if tipo == 'Remoção de Veículo Abandonado' else 0
         psr_atendimentos = 1 if coord_choice == 'CASS' else 0
 
-        # Identificação de dia da semana
         dia_semana_nome = dt.strftime('%A')
         dias_pt = {
             'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira', 'Wednesday': 'Quarta-feira',
             'Thursday': 'Quinta-feira', 'Friday': 'Sexta-feira', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
         }
         dia_pt = dias_pt.get(dia_semana_nome, dia_semana_nome)
-        fim_semana = True if dt.weekday() in [4, 5, 6] else False # Sex, Sáb, Dom
+        fim_semana = True if dt.weekday() in [4, 5, 6] else False
 
         data.append({
             'id_bogcm': bogcm_id,
