@@ -4,6 +4,7 @@ Rodar:  streamlit run app.py
 Dados:  coloque a exportação real em dados/bogcm.csv (ou .xlsx). Sem arquivo,
         o painel usa dados fictícios e avisa isso no topo.
 """
+import html as _html
 import os
 
 import pandas as pd
@@ -24,35 +25,71 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# TOKENS DE DESIGN (para trocar o visual, mexa só aqui)
+# TEMAS: o botão da barra lateral escolhe entre os dois. Para mudar cores, mexa só aqui.
 # ==============================================================================
-PAPEL = "#0A1230"      # fundo da página: azul-marinho, não preto
-FICHA = "#111B42"      # superfícies em destaque (faixa de indicadores, achado)
-LATERAL = "#0D1636"    # barra lateral
-AZUL = "#0B1B82"       # azul Niterói: só a faixa do cabeçalho
-DESTAQUE = "#F1C21B"   # dourado da Guarda: o que o gráfico quer que você veja
-DADO = "#6F8CE0"       # barras de dado comum quando não há destaque
-TINTA = "#E8EEFB"      # texto
-SUAVE = "#9AA8C7"      # texto secundário
-NEVOA = "#4F64A8"      # barras sem destaque, ao lado de uma em DESTAQUE
-LINHA = "#26346A"      # filetes
-OURO = DESTAQUE
-ALERTA = "#FF8A4C"     # só para o que a qualidade do registro pede atenção
+TEMAS = {
+    "escuro": dict(
+        papel="#0A1230",       # fundo da página: azul-marinho, não preto
+        ficha="#111B42",       # superfícies em destaque (faixa de indicadores, tabelas)
+        lateral="#0D1636",
+        destaque="#F1C21B",    # dourado da Guarda: o que o gráfico quer que você veja
+        dado="#6F8CE0",        # barras de dado comum
+        nevoa="#4F64A8",       # barras sem destaque, ao lado de uma em destaque
+        tinta="#E8EEFB", suave="#9AA8C7", linha="#26346A", alerta="#FF8A4C",
+        sobre_destaque="#0A1230",   # texto sobre o dourado
+        esquema="dark", mapa="carto-darkmatter",
+        grupo={"100": "#F0625A", "200": "#F1A83B", "300": "#3FBF7F", "400": "#5AA2F5", "500": "#A58BE0"},
+        inspetoria={
+            "1ª Inspetoria (Centro)": "#E5B93C", "2ª Inspetoria (Icaraí)": "#5AA2F5",
+            "3ª Inspetoria (São Francisco)": "#A58BE0", "4ª Inspetoria (Fonseca)": "#F0625A",
+            "5ª Inspetoria (Oceânica)": "#3FBF7F", "Não mapeada": "#8A97B8",
+        },
+        categorias=["#5AA2F5", "#F1A83B", "#3FBF7F", "#A58BE0", "#F0625A",
+                    "#4FC3C8", "#E58BC0", "#C9D45A", "#8A97B8", "#F29E7A"],
+    ),
+    "claro": dict(
+        papel="#EAF0F8", ficha="#FFFFFF", lateral="#F6F8FC",
+        destaque="#0B1B82", dado="#3E63D8", nevoa="#9DB0D6",
+        tinta="#101B3F", suave="#566380", linha="#C9D5E8", alerta="#C2410C",
+        sobre_destaque="#FFFFFF",
+        esquema="light", mapa="carto-positron",
+        grupo={"100": "#B3261E", "200": "#A66A00", "300": "#2F7D4F", "400": "#2563B8", "500": "#6B4FA3"},
+        inspetoria={
+            "1ª Inspetoria (Centro)": "#B07F00", "2ª Inspetoria (Icaraí)": "#3B82F6",
+            "3ª Inspetoria (São Francisco)": "#8B5CF6", "4ª Inspetoria (Fonseca)": "#EF4444",
+            "5ª Inspetoria (Oceânica)": "#10B981", "Não mapeada": "#94A3B8",
+        },
+        categorias=["#2563B8", "#B45309", "#2F7D4F", "#6B4FA3", "#B3261E",
+                    "#0E7490", "#BE3A87", "#6B7A12", "#566380", "#C2570C"],
+    ),
+}
+
+
+def _botao_tema() -> bool:
+    """Botão no topo da barra lateral. Ligado = tema escuro."""
+    try:
+        return st.sidebar.toggle("Tema escuro", value=True)
+    except AttributeError:  # Streamlit antigo, sem toggle
+        return st.sidebar.checkbox("Tema escuro", value=True)
+
+
+TEMA = TEMAS["escuro" if _botao_tema() else "claro"]
+PAPEL, FICHA, LATERAL = TEMA["papel"], TEMA["ficha"], TEMA["lateral"]
+DESTAQUE, DADO, NEVOA = TEMA["destaque"], TEMA["dado"], TEMA["nevoa"]
+TINTA, SUAVE, LINHA, ALERTA = TEMA["tinta"], TEMA["suave"], TEMA["linha"], TEMA["alerta"]
+COR_GRUPO, COR_INSPETORIA, CATEGORIAS = TEMA["grupo"], TEMA["inspetoria"], TEMA["categorias"]
+ESTILO_MAPA = TEMA["mapa"]
+AZUL = "#0B1B82"       # azul Niterói: faixa do cabeçalho, nos dois temas
+OURO = "#F1C21B"       # filete do cabeçalho e selo de dados fictícios, nos dois temas
 FONTE_TITULO = "'Barlow Condensed', 'Arial Narrow', sans-serif"
 FONTE_TEXTO = "'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
-COR_GRUPO = {"100": "#F0625A", "200": "#F1A83B", "300": "#3FBF7F", "400": "#5AA2F5", "500": "#A58BE0"}
-COR_INSPETORIA = {
-    "1ª Inspetoria (Centro)": "#E5B93C", "2ª Inspetoria (Icaraí)": "#5AA2F5",
-    "3ª Inspetoria (São Francisco)": "#A58BE0", "4ª Inspetoria (Fonseca)": "#F0625A",
-    "5ª Inspetoria (Oceânica)": "#3FBF7F", "Não mapeada": "#8A97B8",
-}
 DIAS_CURTOS = {"Segunda-feira": "seg", "Terça-feira": "ter", "Quarta-feira": "qua", "Quinta-feira": "qui",
                "Sexta-feira": "sex", "Sábado": "sáb", "Domingo": "dom"}
 
 CSS_VARIAVEIS = (
-    f":root{{--papel:{PAPEL};--ficha:{FICHA};--lateral:{LATERAL};--azul:{AZUL};--destaque:{DESTAQUE};"
-    f"--tinta:{TINTA};--suave:{SUAVE};"
+    f":root{{color-scheme:{TEMA['esquema']};--papel:{PAPEL};--ficha:{FICHA};--lateral:{LATERAL};--azul:{AZUL};"
+    f"--destaque:{DESTAQUE};--sobre-destaque:{TEMA['sobre_destaque']};--tinta:{TINTA};--suave:{SUAVE};"
     f"--nevoa:{NEVOA};--linha:{LINHA};--ouro:{OURO};--alerta:{ALERTA};"
     f"--f-titulo:{FONTE_TITULO};--f-texto:{FONTE_TEXTO};}}"
 )
@@ -69,7 +106,8 @@ p, li, label, [data-testid="stCaptionContainer"] { font-size: 1rem; }
 [data-testid="stCaptionContainer"] { color: var(--suave); }
 
 /* barra lateral */
-[data-testid="stSidebar"] { background: var(--lateral); border-right: 1px solid var(--linha); }
+[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background: var(--lateral); }
+[data-testid="stSidebar"] { border-right: 1px solid var(--linha); }
 [data-testid="stSidebar"] h3 { font-size: 1.25rem; margin: 1.1rem 0 .1rem; }
 .lateral-nome { font-family: var(--f-titulo); font-size: 1.5rem; font-weight: 600; line-height: 1.05; margin: 0; }
 .lateral-sub { color: var(--suave); font-size: .9rem; margin: .2rem 0 0; }
@@ -82,7 +120,7 @@ p, li, label, [data-testid="stCaptionContainer"] { font-size: 1rem; }
 .mast h1 { color: #fff; font-size: clamp(1.8rem, 3.4vw, 2.6rem); line-height: 1.05; margin: .35rem 0 .25rem; padding: 0; }
 .mast-sub { color: #D6DEF5; margin: 0; font-size: 1rem; }
 .selo { font-size: .88rem; font-weight: 600; padding: .22rem .7rem; border-radius: 999px; white-space: nowrap; }
-.selo-ficticio { background: var(--ouro); color: var(--papel); }
+.selo-ficticio { background: var(--ouro); color: #0A1230; }
 .selo-real { border: 1px solid #fff; color: #fff; }
 
 /* faixa de indicadores */
@@ -120,6 +158,46 @@ div[data-baseweb="tab-border"] { background-color: var(--linha); }
 @media (max-width: 900px) { .passos { grid-template-columns: 1fr 1fr; } }
 .efeito { color: var(--suave); font-size: .92rem; margin: 0; line-height: 1.35; }
 .nota-alerta { color: var(--alerta); font-weight: 500; }
+
+/* avisos próprios (não dependem do tema do Streamlit) */
+.aviso { background: var(--ficha); border: 1px solid var(--linha); border-left: 4px solid var(--destaque); padding: .7rem 1rem; margin: .5rem 0; color: var(--tinta); }
+.aviso-alerta { border-left-color: var(--alerta); }
+
+/* tabelas próprias: seguem o tema escolhido no botão */
+.tabela-wrap { max-height: 540px; overflow: auto; border: 1px solid var(--linha); background: var(--ficha); margin: .4rem 0 .8rem; }
+.tabela-wrap table.tabela { width: 100%; border-collapse: collapse; font-size: .93rem; color: var(--tinta); background: transparent; }
+.tabela-wrap table.tabela th { position: sticky; top: 0; background: var(--lateral); color: var(--tinta); text-align: left; font-weight: 600; padding: .55rem .8rem; border: 0; border-bottom: 2px solid var(--linha); white-space: nowrap; }
+.tabela-wrap table.tabela td { padding: .45rem .8rem; border: 0; border-bottom: 1px solid var(--linha); vertical-align: top; color: var(--tinta); }
+.tabela-wrap table.tabela tr:last-child td { border-bottom: 0; }
+.tabela-wrap table.tabela .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabela-wrap table.tabela .cod { font-family: var(--f-titulo); font-weight: 600; font-size: 1.1rem; white-space: nowrap; }
+.barra { display: inline-block; vertical-align: middle; width: 90px; height: 8px; background: var(--linha); margin-right: .55rem; }
+.barra > span { display: block; height: 100%; background: var(--destaque); }
+
+/* widgets nativos seguem o tema do botão, não o do config.toml */
+.stApp [data-testid="stWidgetLabel"] p, .stApp [data-testid="stWidgetLabel"] label,
+.stApp [data-testid="stWidgetLabel"] span, .stApp .stCheckbox p, .stApp .stRadio p, .stApp .stToggle p { color: var(--tinta) !important; }
+.stApp div[data-baseweb="select"] > div, .stApp div[data-baseweb="input"] > div,
+.stApp div[data-baseweb="base-input"] { background: var(--ficha) !important; border-color: var(--linha) !important; }
+.stApp div[data-baseweb="select"] *, .stApp input, .stApp textarea { color: var(--tinta) !important; -webkit-text-fill-color: var(--tinta); }
+.stApp input::placeholder, .stApp textarea::placeholder { color: var(--suave) !important; -webkit-text-fill-color: var(--suave); opacity: 1; }
+.stApp div[data-baseweb="select"] svg { fill: var(--suave) !important; }
+.stApp span[data-baseweb="tag"] { background: var(--destaque) !important; }
+.stApp span[data-baseweb="tag"], .stApp span[data-baseweb="tag"] * { color: var(--sobre-destaque) !important; -webkit-text-fill-color: var(--sobre-destaque); }
+div[data-baseweb="popover"], div[data-baseweb="popover"] > div, div[data-baseweb="menu"], ul[role="listbox"] { background: var(--ficha) !important; color: var(--tinta) !important; }
+li[role="option"], li[role="option"] * { color: var(--tinta) !important; -webkit-text-fill-color: var(--tinta); }
+li[role="option"]:hover, li[role="option"][aria-selected="true"] { background: var(--linha) !important; }
+div[data-baseweb="calendar"] { background: var(--ficha) !important; }
+div[data-baseweb="calendar"] * { color: var(--tinta); }
+.stApp [data-testid="stSliderThumbValue"], .stApp [data-testid="stTickBarMin"], .stApp [data-testid="stTickBarMax"] { color: var(--tinta) !important; }
+button[data-testid="stBaseButton-pills"], button[kind="pills"] { background: var(--ficha) !important; border: 1px solid var(--linha) !important; }
+button[data-testid="stBaseButton-pills"] *, button[kind="pills"] * { color: var(--tinta) !important; }
+button[data-testid="stBaseButton-pillsActive"], button[kind="pillsActive"] { background: var(--destaque) !important; border: 1px solid var(--destaque) !important; }
+button[data-testid="stBaseButton-pillsActive"] *, button[kind="pillsActive"] * { color: var(--sobre-destaque) !important; }
+[data-testid="stDownloadButton"] button, .stDownloadButton button { background: var(--ficha) !important; border: 1px solid var(--linha) !important; }
+[data-testid="stDownloadButton"] button *, .stDownloadButton button * { color: var(--tinta) !important; }
+[data-testid="stHeader"] *, [data-testid="stToolbar"] * { color: var(--suave) !important; }
+[data-testid="stHeader"] svg, [data-testid="stSidebarCollapseButton"] svg, [data-testid="stExpandSidebarButton"] svg { fill: var(--suave) !important; color: var(--suave) !important; }
 """
 st.markdown(f"<style>{CSS_VARIAVEIS}{CSS}</style>", unsafe_allow_html=True)
 
@@ -144,11 +222,66 @@ def mostrar(fig):
         st.plotly_chart(fig, width="stretch", theme=None, config=cfg)
 
 
-def tabela(df, **kw):
+def caixa_aviso(texto: str, tipo: str = "info"):
+    """Aviso na cor do tema. tipo: 'info' ou 'alerta'."""
+    classe = "aviso aviso-alerta" if tipo == "alerta" else "aviso"
+    st.markdown(f'<div class="{classe}">{_html.escape(texto)}</div>', unsafe_allow_html=True)
+
+
+def mostrar_tabela(df, barras=(), numericas=(), codigo=(), max_linhas=500):
+    """Tabela HTML com o visual do painel (a tabela nativa não acompanha o botão de tema).
+
+    barras: colunas de percentual (0 a 100) desenhadas como barra; numericas: inteiros
+    alinhados à direita; codigo: colunas com o número do código em destaque.
+    """
+    colunas = list(df.columns)
+
+    def classe(c):
+        return ' class="num"' if (c in barras or c in numericas) else ""
+
+    cabecalho = "".join(f"<th{classe(c)}>{_html.escape(str(c))}</th>" for c in colunas)
+    linhas = []
+    for valores in df.head(max_linhas).itertuples(index=False):
+        celulas = []
+        for c, v in zip(colunas, valores):
+            vazio = v is None or (not isinstance(v, (list, tuple)) and bool(pd.isna(v)))
+            if c in barras:
+                if vazio:
+                    celulas.append('<td class="num">—</td>')
+                else:
+                    larg = min(max(float(v), 0.0), 100.0)
+                    celulas.append(f'<td class="num"><span class="barra"><span style="width:{larg:.1f}%"></span></span>'
+                                   f'{p_br(float(v))}%</td>')
+                continue
+            if vazio:
+                texto = "—"
+            elif c in numericas:
+                texto = n_br(v)
+            elif isinstance(v, pd.Timestamp):
+                texto = v.strftime("%d/%m/%Y %H:%M")
+            elif isinstance(v, (bool,)) or type(v).__name__ == "bool_":
+                texto = "Sim" if v else "Não"
+            elif isinstance(v, float):
+                texto = p_br(v)
+            else:
+                texto = str(v)
+            atributo = classe(c) or (' class="cod"' if c in codigo else "")
+            celulas.append(f"<td{atributo}>{_html.escape(texto)}</td>")
+        linhas.append("<tr>" + "".join(celulas) + "</tr>")
+    st.markdown(
+        f'<div class="tabela-wrap"><table class="tabela"><thead><tr>{cabecalho}</tr></thead>'
+        f'<tbody>{"".join(linhas)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def seletor_multiplo(rotulo, opcoes, formato=str):
+    """Botões de seleção múltipla (pills); em versões sem pills, cai para multiselect."""
     try:
-        st.dataframe(df, use_container_width=True, hide_index=True, **kw)
-    except Exception:  # versões novas removeram use_container_width
-        st.dataframe(df, width="stretch", hide_index=True, **kw)
+        escolha = st.pills(rotulo, opcoes, selection_mode="multi", format_func=formato, label_visibility="collapsed")
+    except Exception:
+        escolha = st.multiselect(rotulo, opcoes, format_func=formato, placeholder="Todas", label_visibility="collapsed")
+    return list(escolha or [])
 
 
 def estilo(fig, altura=320, **kw):
@@ -159,8 +292,9 @@ def estilo(fig, altura=320, **kw):
         margin=dict(t=10, b=10, l=10, r=10),
         hoverlabel=dict(bgcolor=FICHA, bordercolor=LINHA, font=dict(family="Barlow, system-ui, sans-serif", color=TINTA)), **kw,
     )
-    fig.update_xaxes(showgrid=False, zeroline=False, linecolor=LINHA, tickfont=dict(color=SUAVE))
-    fig.update_yaxes(gridcolor=LINHA, zeroline=False, tickfont=dict(color=SUAVE))
+    # automargin: o eixo abre espaço para rótulos longos em vez de cortá-los na borda
+    fig.update_xaxes(showgrid=False, zeroline=False, linecolor=LINHA, tickfont=dict(color=SUAVE), automargin=True)
+    fig.update_yaxes(gridcolor=LINHA, zeroline=False, tickfont=dict(color=SUAVE), automargin=True)
     return fig
 
 
@@ -177,10 +311,30 @@ def barras_h(rotulos, valores, textos, cores, altura):
     return fig
 
 
+def rosca(rotulos, valores, cores, altura=280):
+    """Pizza com furo no meio: o total fica no centro e o percentual de cada fatia, na legenda."""
+    rotulos, valores = list(rotulos), [float(v) for v in valores]
+    total = sum(valores) or 1.0
+    legenda = [f"{r}   {p_br(v / total * 100, 0)}%" for r, v in zip(rotulos, valores)]
+    fig = go.Figure(go.Pie(
+        labels=legenda, values=valores, hole=0.6, sort=False, direction="clockwise",
+        marker=dict(colors=list(cores), line=dict(color=PAPEL, width=2)),
+        textinfo="none", domain=dict(x=[0, 0.5], y=[0, 1]),
+        hovertemplate="%{label}<br>%{value} boletins<extra></extra>",
+    ))
+    estilo(fig, altura=altura, showlegend=True,
+           legend=dict(x=0.54, y=0.5, xanchor="left", yanchor="middle", font=dict(size=13, color=TINTA)))
+    fig.update_layout(annotations=[dict(
+        text=f"<b>{n_br(total)}</b>", x=0.25, y=0.5, showarrow=False,
+        font=dict(size=24, color=TINTA, family="Barlow Condensed, Barlow, sans-serif"),
+    )])
+    return fig
+
+
 def container_destaque():
     try:
         return st.container(key="destaque")
-    except TypeError:  # Streamlit antigo: sem key, só perde o painel branco
+    except TypeError:  # Streamlit antigo: sem key, só perde o painel de destaque
         return st.container()
 
 
@@ -312,10 +466,10 @@ st.markdown(
 )
 
 for aviso in meta["avisos"]:
-    st.warning(aviso)
+    caixa_aviso(aviso, 'alerta')
 
 if n == 0:
-    st.info("Nenhum boletim com esses filtros. Amplie o período ou limpe o filtro de hora ou de código na barra lateral.")
+    caixa_aviso("Nenhum boletim com esses filtros. Amplie o período ou limpe o filtro de hora ou de código na barra lateral.")
     st.stop()
 
 comp = ind.comparativo_ano(df_base, ts_ini, ts_fim)
@@ -418,27 +572,33 @@ with tab_pan:
         fig.update_yaxes(visible=False)
         mostrar(fig)
 
+    st.markdown("#### Por turno do dia")
+    turnos = [("Madrugada (0h–5h59)", range(0, 6)), ("Manhã (6h–11h59)", range(6, 12)),
+              ("Tarde (12h–17h59)", range(12, 18)), ("Noite (18h–23h59)", range(18, 24))]
+    por_hora_t = ind.contagem_por_hora(df_f)
+    vals_t = [int(por_hora_t.loc[list(r)].sum()) for _, r in turnos]
+    col_t, col_tn = st.columns([3, 2], gap="large")
+    with col_t:
+        mostrar(rosca([t for t, _ in turnos], vals_t, [CATEGORIAS[3], CATEGORIAS[1], CATEGORIAS[0], CATEGORIAS[8]], altura=250))
+    with col_tn:
+        mais = max(range(4), key=lambda i: vals_t[i])
+        st.markdown(f'<p class="faixa-valor">{turnos[mais][0].split(" (")[0]}</p>'
+                    f'<p class="faixa-nota">é o turno com mais boletins, {p_br(vals_t[mais] / max(sum(vals_t), 1) * 100, 0)}% do total do filtro.</p>',
+                    unsafe_allow_html=True)
+
 # ------------------------------------------------------------------ NATUREZA
 with tab_nat:
     col_g, col_p = st.columns([2, 3], gap="large")
     with col_g:
         st.markdown("#### Por grupo de ocorrência")
         g = ind.por_grupo(df_f)
-        fig = go.Figure(go.Bar(
-            y=g["grupo"][::-1], x=g["boletins"][::-1], orientation="h",
-            marker_color=[COR_GRUPO.get(c, NEVOA) for c in g["grupo_cod"][::-1]],
-            text=[f"{p_br(p, 0)}%" for p in g["pct"][::-1]], textposition="outside", cliponaxis=False,
-            hovertemplate="%{y}: %{x} boletins<extra></extra>",
-        ))
-        estilo(fig, altura=300)
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
-        mostrar(fig)
+        mostrar(rosca([f"{c} {nm}" for c, nm in zip(g["grupo_cod"], g["grupo"])], g["boletins"],
+                      [COR_GRUPO.get(c, NEVOA) for c in g["grupo_cod"]], altura=300))
 
     with col_p:
         st.markdown("#### Códigos mais registrados")
         par = ind.pareto_codigos(df_f, n=10)
-        rotulos = [f'{c}  {o if len(o) <= 38 else o[:37] + "…"}' for c, o in zip(par["codigo"], par["ocorrencia"])]
+        rotulos = [f'{c}  {o if len(o) <= 34 else o[:33] + "…"}' for c, o in zip(par["codigo"], par["ocorrencia"])]
         fig = go.Figure(go.Bar(
             y=rotulos[::-1], x=par["boletins"][::-1], orientation="h",
             marker_color=[ALERTA if o else DADO for o in par["e_outros"][::-1]],
@@ -460,14 +620,7 @@ with tab_nat:
         if furto.empty:
             st.caption("Nenhum boletim de furto (106) com tipo informado neste filtro.")
         else:
-            fig = go.Figure(go.Bar(
-                y=furto.index[::-1], x=furto.values[::-1], orientation="h", marker_color=COR_GRUPO["100"],
-                text=[n_br(v) for v in furto.values[::-1]], textposition="outside", cliponaxis=False,
-            ))
-            estilo(fig, altura=240)
-            fig.update_xaxes(visible=False)
-            fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
-            mostrar(fig)
+            mostrar(rosca(furto.index, furto.values, CATEGORIAS[:len(furto)], altura=260))
             st.caption("Pergunta complementar que o formulário abre quando o código é 106.")
     with col_j:
         st.markdown("#### Situação com a Justiça")
@@ -482,6 +635,7 @@ with tab_coord:
     st.caption("O comprimento é o volume. A cor é o grupo de ocorrência: mostra o que cada coordenadoria atende.")
     tc, ordem_c = ind.por_coordenadoria(df_f)
     rotulos_c = list(ordem_c)[::-1]
+    col_cb, col_cp = st.columns([3, 2], gap="large")
     fig = go.Figure()
     for cod_g, nome_g in GRUPOS.items():
         sub_g = tc[tc["grupo_cod"] == cod_g].set_index("servico")["boletins"].reindex(ordem_c, fill_value=0)
@@ -496,10 +650,16 @@ with tab_coord:
         textposition="middle right", showlegend=False, hoverinfo="skip",
     ))
     estilo(fig, altura=max(280, 44 * len(ordem_c) + 90), barmode="stack", showlegend=True, bargap=0.3,
-           legend=dict(orientation="h", y=1.08, x=0, font=dict(color=TINTA)))
-    fig.update_xaxes(visible=False, range=[0, float(totais.max()) * 1.12])
+           legend=dict(orientation="h", y=1.12, x=0, font=dict(color=TINTA)))
+    fig.update_xaxes(visible=False, range=[0, float(totais.max()) * 1.15])
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
-    mostrar(fig)
+    with col_cb:
+        mostrar(fig)
+    with col_cp:
+        st.markdown("##### Participação no total")
+        mostrar(rosca([rotulo_coordenadoria(c) for c in ordem_c], totais.values,
+                      [CATEGORIAS[i % len(CATEGORIAS)] for i in range(len(ordem_c))],
+                      altura=max(280, 44 * len(ordem_c) + 90)))
 
     st.markdown("#### Detalhe de uma coordenadoria")
     escolha_c = st.selectbox("Escolha a coordenadoria", ordem_c, format_func=rotulo_coordenadoria,
@@ -547,30 +707,49 @@ with tab_coord:
 
 # ------------------------------------------------------------------ TERRITÓRIO
 with tab_ter:
-    modo = st.radio("Como mostrar", ["Pontos por grupo", "Pontos por coordenadoria", "Mancha de calor"], horizontal=True, label_visibility="collapsed")
-    no_mapa = df_f[df_f["pino_valido"]]
-    sem_pino = n - len(no_mapa)
+    st.markdown("#### Filtrar o mapa por inspetoria")
+    insp_disp = sorted(df_f["inspetoria"].unique())
+    insp_mapa = seletor_multiplo("Inspetorias no mapa", insp_disp)
+    df_t = df_f[df_f["inspetoria"].isin(insp_mapa)] if insp_mapa else df_f
+    n_t = len(df_t)
+    if insp_mapa:
+        st.caption(f"Mapa, gráficos e bairros abaixo mostram {n_br(n_t)} boletins de: {', '.join(insp_mapa)}. "
+                   "Sem nenhuma selecionada, aparecem todas.")
+    else:
+        st.caption("Nenhuma inspetoria selecionada: o mapa mostra todas. Clique em uma ou mais para isolar.")
+
+    modo = st.radio("Como mostrar", ["Pontos por grupo", "Pontos por inspetoria", "Pontos por coordenadoria", "Mancha de calor"],
+                    horizontal=True, label_visibility="collapsed")
+    no_mapa = df_t[df_t["pino_valido"]]
+    sem_pino = n_t - len(no_mapa)
 
     col_mapa, col_bairro = st.columns([3, 2], gap="large")
     with col_mapa:
         if no_mapa.empty:
-            st.info("Nenhum boletim com pino válido neste filtro.")
+            caixa_aviso("Nenhum boletim com pino válido neste filtro.")
         else:
-            estilo_mapa = "carto-darkmatter"
-            comum = dict(lat="latitude", lon="longitude", zoom=11, center=CENTRO_MAPA,
+            if insp_mapa:  # aproxima da área escolhida
+                centro = {"lat": float(no_mapa["latitude"].mean()), "lon": float(no_mapa["longitude"].mean())}
+                zoom = 12.3 if len(insp_mapa) == 1 else 11.6
+            else:
+                centro, zoom = CENTRO_MAPA, 11
+            comum = dict(lat="latitude", lon="longitude", zoom=zoom, center=centro,
                          hover_name="ocorrencia", hover_data={"bairro": True, "hora": True, "latitude": False, "longitude": False})
-            if modo in ("Pontos por grupo", "Pontos por coordenadoria"):
+            if modo != "Mancha de calor":
                 amostra = no_mapa if len(no_mapa) <= 6000 else no_mapa.sample(6000, random_state=1)
                 if modo == "Pontos por grupo":
                     cores = {f"{k} - {v}": COR_GRUPO[k] for k, v in GRUPOS.items()}
                     args = dict(color="grupo", color_discrete_map=cores, **comum)
+                elif modo == "Pontos por inspetoria":
+                    args = dict(color="inspetoria", color_discrete_map=COR_INSPETORIA,
+                                category_orders={"inspetoria": list(COR_INSPETORIA)}, **comum)
                 else:
-                    args = dict(color="servico", color_discrete_sequence=px.colors.qualitative.Safe,
+                    args = dict(color="servico", color_discrete_sequence=CATEGORIAS,
                                 category_orders={"servico": ordem_coord}, **comum)
                 if hasattr(px, "scatter_map"):
-                    fig = px.scatter_map(amostra, map_style=estilo_mapa, **args)
+                    fig = px.scatter_map(amostra, map_style=ESTILO_MAPA, **args)
                 else:
-                    fig = px.scatter_mapbox(amostra, mapbox_style=estilo_mapa, **args)
+                    fig = px.scatter_mapbox(amostra, mapbox_style=ESTILO_MAPA, **args)
                 fig.update_traces(marker=dict(size=7, opacity=0.8))
                 fig.update_layout(legend=dict(orientation="h", y=-0.02, title_text="", font=dict(color=TINTA)))
                 if len(no_mapa) > 6000:
@@ -578,32 +757,34 @@ with tab_ter:
             else:
                 args = dict(z=[1] * len(no_mapa), radius=14, color_continuous_scale="YlOrRd", **comum)
                 if hasattr(px, "density_map"):
-                    fig = px.density_map(no_mapa, map_style=estilo_mapa, **args)
+                    fig = px.density_map(no_mapa, map_style=ESTILO_MAPA, **args)
                 else:
-                    fig = px.density_mapbox(no_mapa, mapbox_style=estilo_mapa, **args)
+                    fig = px.density_mapbox(no_mapa, mapbox_style=ESTILO_MAPA, **args)
                 fig.update_coloraxes(showscale=False)
             fig.update_layout(margin=dict(r=0, t=0, l=0, b=0), height=520, paper_bgcolor="rgba(0,0,0,0)",
                               font=dict(family="Barlow, system-ui, sans-serif", color=TINTA))
             mostrar(fig)
-        if sem_pino:
-            st.caption(f"{n_br(sem_pino)} boletins ({p_br(sem_pino / n * 100)}%) estão sem pino válido e não aparecem no mapa. "
+        if sem_pino and n_t:
+            st.caption(f"{n_br(sem_pino)} boletins ({p_br(sem_pino / n_t * 100)}%) estão sem pino válido e não aparecem no mapa. "
                        "Pino errado, mapa errado.")
 
     with col_bairro:
         st.markdown("#### Bairros com mais boletins")
-        top = (df_f.groupby(["bairro", "inspetoria"]).size().reset_index(name="boletins")
-               .sort_values("boletins", ascending=False).head(12))
+        top = (df_t.groupby(["bairro", "inspetoria"]).size().reset_index(name="boletins")
+               .sort_values("boletins", ascending=False).head(10))
         fig = go.Figure(go.Bar(
             y=top["bairro"][::-1], x=top["boletins"][::-1], orientation="h",
             marker_color=[COR_INSPETORIA.get(i, NEVOA) for i in top["inspetoria"][::-1]],
             text=[n_br(v) for v in top["boletins"][::-1]], textposition="outside", cliponaxis=False,
             customdata=top["inspetoria"][::-1], hovertemplate="%{y} (%{customdata}): %{x} boletins<extra></extra>",
         ))
-        estilo(fig, altura=520)
+        estilo(fig, altura=320)
         fig.update_xaxes(visible=False)
         fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
         mostrar(fig)
-        st.caption("Cor da barra: inspetoria do bairro.")
+        st.markdown("#### Por inspetoria")
+        pi = df_t["inspetoria"].value_counts().reindex([i for i in COR_INSPETORIA if i in set(df_t["inspetoria"])])
+        mostrar(rosca(pi.index, pi.values, [COR_INSPETORIA[i] for i in pi.index], altura=240))
 
 # ------------------------------------------------------------------ QUALIDADE
 with tab_qual:
@@ -638,11 +819,9 @@ with tab_qual:
             "pct_sem_pino": "Sem pino válido", "pct_dia_diferente": "Registrado em outro dia",
             "pct_relato_fraco": "Relato curto ou genérico",
         })
-        cfg = {c: st.column_config.ProgressColumn(c, format="%.1f%%", min_value=0, max_value=100)
-               for c in mostrar_tab.columns[2:] if mostrar_tab[c].notna().any()}
-        cfg["Boletins"] = st.column_config.NumberColumn("Boletins", format="%d")
-        tabela(mostrar_tab.drop(columns=[c for c in mostrar_tab.columns[2:] if mostrar_tab[c].isna().all()]),
-               column_config=cfg)
+        vazias = [c for c in mostrar_tab.columns[2:] if mostrar_tab[c].isna().all()]
+        mostrar_tabela(mostrar_tab.drop(columns=vazias), barras=[c for c in mostrar_tab.columns[2:] if c not in vazias],
+                       numericas=["Boletins"])
         st.caption("Ordenado por uso do código “Outros”. Serve para saber onde reforçar a orientação, não para ranquear guardas.")
 
 # ------------------------------------------------------------------ CÓDIGOS E MÉTODO
@@ -660,14 +839,9 @@ with tab_cod:
         and (not termo or termo in c["codigo"] or termo in c["nome"].lower() or termo in c["guia"].lower())
     ]
     if linhas:
-        tabela(pd.DataFrame(linhas), column_config={
-            "Código": st.column_config.TextColumn(width="small"),
-            "Ocorrência": st.column_config.TextColumn(width="medium"),
-            "Grupo": st.column_config.TextColumn(width="small"),
-            "Como preencher": st.column_config.TextColumn(width="large"),
-        })
+        mostrar_tabela(pd.DataFrame(linhas), codigo=["Código"])
     else:
-        st.info("Nenhum código com essa busca. Tente o número do código ou outra palavra.")
+        caixa_aviso("Nenhum código com essa busca. Tente o número do código ou outra palavra.")
 
     st.markdown("---")
     st.markdown("#### Duas fontes, duas perguntas")
@@ -712,11 +886,9 @@ with tab_micro:
     ordem_micro = st.selectbox("Ordenar por", list(ordens))
     cols_o, asc_o = ordens[ordem_micro]
     vista = df_f[list(colunas)].rename(columns=colunas).sort_values(cols_o, ascending=asc_o)
-    tabela(vista.head(5000), column_config={
-        "Data e hora": st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm"),
-    })
-    if len(vista) > 5000:
-        st.caption(f"Mostrando as 5.000 primeiras linhas de {n_br(len(vista))}, na ordem escolhida. O download leva todas.")
+    mostrar_tabela(vista, codigo=["Código"], max_linhas=500)
+    if len(vista) > 500:
+        st.caption(f"Mostrando as 500 primeiras linhas de {n_br(len(vista))}, na ordem escolhida. O download leva todas.")
     st.download_button(
         "Baixar CSV (abre no Excel)",
         data=vista.to_csv(index=False, sep=";", encoding="utf-8-sig").encode("utf-8-sig"),
